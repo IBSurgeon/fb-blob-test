@@ -9,7 +9,7 @@ constexpr const char* db = "inet://localhost:3055/horses";
 
 constexpr const char* sql = R"(
     SELECT 
-      CODE_COLOR, NAME
+      CODE_COLOR, -12.670
     FROM COLOR
     WHERE CODE_COLOR < ?
 )";

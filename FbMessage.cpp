@@ -1,5 +1,6 @@
 #include "FbMessage.h"
 
+#include <cmath>
 #include <stdexcept>
 
 namespace {
@@ -27,9 +28,15 @@ namespace {
 
 	std::string to_string(int64_t value, short scale)
 	{
-		auto f = value / SCALES[scale];
-		auto z = value % SCALES[scale];
-		return "";
+		auto i = value / SCALES[scale];
+		auto frac = abs(value) % SCALES[scale];
+
+
+		char buf[20];
+		snprintf(buf, std::size(buf), "%d.%*d",
+			i, scale, frac);
+
+		return buf;
 	}
 }
 
@@ -585,6 +592,158 @@ namespace FirebirdHelper {
 		*getTimestampPtr() = value;
 	}
 
+	const ISC_TIME_TZ* sqlda::getTimeTzPtr() const
+	{
+		switch (type) {
+		case SQL_TIME_TZ:
+			return getValuePtr<ISC_TIME_TZ>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIME_TZ";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIME_TZ* sqlda::getTimeTzPtr()
+	{
+		switch (type) {
+		case SQL_TIME_TZ:
+			return getValuePtr<ISC_TIME_TZ>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIME_TZ";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIME_TZ sqlda::getTimeTzValue() const
+	{
+		return *getTimeTzPtr();
+	}
+
+	void sqlda::setTimeTzValue(const ISC_TIME_TZ& value)
+	{
+		*getTimeTzPtr() = value;
+	}
+
+	const ISC_TIME_TZ_EX* sqlda::getTimeTzExPtr() const
+	{
+		switch (type) {
+		case SQL_TIME_TZ_EX:
+			return getValuePtr<ISC_TIME_TZ_EX>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIME_TZ_EX";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIME_TZ_EX* sqlda::getTimeTzExPtr()
+	{
+		switch (type) {
+		case SQL_TIME_TZ_EX:
+			return getValuePtr<ISC_TIME_TZ_EX>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIME_TZ_EX";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIME_TZ_EX sqlda::getTimeTzExValue() const
+	{
+		return *getTimeTzExPtr();
+	}
+
+	void sqlda::setTimeTzExValue(const ISC_TIME_TZ_EX& value)
+	{
+		*getTimeTzExPtr() = value;
+	}
+
+	const ISC_TIMESTAMP_TZ* sqlda::getTimestampTzPtr() const
+	{
+		switch (type) {
+		case SQL_TIMESTAMP_TZ:
+			return getValuePtr<ISC_TIMESTAMP_TZ>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIMESTAMP_TZ";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIMESTAMP_TZ* sqlda::getTimestampTzPtr()
+	{
+		switch (type) {
+		case SQL_TIMESTAMP_TZ:
+			return getValuePtr<ISC_TIMESTAMP_TZ>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIMESTAMP_TZ";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIMESTAMP_TZ sqlda::getTimestampTzValue() const
+	{
+		return *getTimestampTzPtr();
+	}
+
+	void sqlda::setTimestampTzValue(const ISC_TIMESTAMP_TZ& value)
+	{
+		*getTimestampTzPtr() = value;
+	}
+
+	const ISC_TIMESTAMP_TZ_EX* sqlda::getTimestampTzExPtr() const
+	{
+		switch (type) {
+		case SQL_TIMESTAMP_TZ_EX:
+			return getValuePtr<ISC_TIMESTAMP_TZ_EX>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIMESTAMP_TZ_EX";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIMESTAMP_TZ_EX* sqlda::getTimestampTzExPtr()
+	{
+		switch (type) {
+		case SQL_TIMESTAMP_TZ_EX:
+			return getValuePtr<ISC_TIMESTAMP_TZ_EX>();
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to ISC_TIMESTAMP_TZ_EX";
+			throw std::runtime_error(message);
+		}
+		}
+	}
+
+	ISC_TIMESTAMP_TZ_EX sqlda::getTimestampTzExValue() const
+	{
+		return *getTimestampTzExPtr();
+	}
+
+	void sqlda::setTimestampTzExValue(const ISC_TIMESTAMP_TZ_EX& value)
+	{
+		*getTimestampTzExPtr() = value;
+	}
+
 	const char* sqlda::getCharPtr() const
 	{
 		if (type != SQL_TEXT) {
@@ -741,7 +900,7 @@ namespace FirebirdHelper {
 			auto iDec16 = util->getDecFloat16(&status);
 			std::string sDec16;
 			sDec16.reserve(Firebird::IDecFloat16::STRING_SIZE);
-			iDec16->toString(&status, dec16Val, Firebird::IInt128::STRING_SIZE, sDec16.data());
+			iDec16->toString(&status, dec16Val, Firebird::IDecFloat16::STRING_SIZE, sDec16.data());
 			return sDec16;
 		}
 		case SQL_DEC34: {
@@ -749,7 +908,7 @@ namespace FirebirdHelper {
 			auto iDec34 = util->getDecFloat34(&status);
 			std::string sDec34;
 			sDec34.reserve(Firebird::IDecFloat34::STRING_SIZE);
-			iDec34->toString(&status, dec34Val, Firebird::IInt128::STRING_SIZE, sDec34.data());
+			iDec34->toString(&status, dec34Val, Firebird::IDecFloat34::STRING_SIZE, sDec34.data());
 			return sDec34;
 		}
 		case SQL_TYPE_DATE:
@@ -758,7 +917,7 @@ namespace FirebirdHelper {
 			FbDate date{ 0, 0, 0 };
 			util->decodeDate(dateValue, &date.year, &date.month, &date.day);
 			char dateBuf[10];
-			snprintf(dateBuf, std::size(dateBuf), "%d-%d-%d",
+			snprintf(dateBuf, std::size(dateBuf), "%.4u-%.2u-%.2u",
 				date.year, date.month, date.day);
 			return dateBuf;
 		}
@@ -768,7 +927,7 @@ namespace FirebirdHelper {
 			FbTime time{ 0, 0, 0, 0 };
 			util->decodeTime(timeValue, &time.hours, &time.minutes, &time.seconds, &time.fractions);
 			char dateBuf[15];
-			snprintf(dateBuf, std::size(dateBuf), "%d:%d:%d.%d",
+			snprintf(dateBuf, std::size(dateBuf), "%.2u:%.2u:%.2u.%.4u",
 				time.hours, time.minutes, time.seconds, time.fractions);
 			return dateBuf;
 		}
@@ -779,9 +938,77 @@ namespace FirebirdHelper {
 			util->decodeDate(tsValue.timestamp_date, &ts.year, &ts.month, &ts.day);
 			util->decodeTime(tsValue.timestamp_time, &ts.hours, &ts.minutes, &ts.seconds, &ts.fractions);
 			char dateBuf[26];
-			snprintf(dateBuf, std::size(dateBuf), "%d-%d-%d %d:%d:%d.%d",
+			snprintf(dateBuf, std::size(dateBuf), "%.4u-%.2u-%.2u %.2u:%.2u:%.2u.%.4u",
 				ts.year, ts.month, ts.day,
 				ts.hours, ts.minutes, ts.seconds, ts.fractions);
+			return dateBuf;
+		}
+		case SQL_TIME_TZ:
+		{
+			auto timeTzPtr = getTimeTzPtr();
+			FbTime time{ 0, 0, 0, 0 };
+			std::string tz;
+			tz.reserve(30);
+			util->decodeTimeTz(&status, timeTzPtr, 
+				&time.hours, &time.minutes, &time.seconds, &time.fractions, 
+				tz.capacity(), tz.data()
+			);
+			char dateBuf[50];
+			snprintf(dateBuf, std::size(dateBuf), "%.2u:%.2u:%.2u.%.4u %s",
+				time.hours, time.minutes, time.seconds, time.fractions, tz.c_str());
+			return dateBuf;
+		}
+		case SQL_TIME_TZ_EX:
+		{
+			auto timeTzExPtr = getTimeTzExPtr();
+			FbTime time{ 0, 0, 0, 0 };
+			std::string tz;
+			tz.reserve(30);
+			util->decodeTimeTzEx(&status, timeTzExPtr,
+				&time.hours, &time.minutes, &time.seconds, &time.fractions,
+				tz.capacity(), tz.data()
+			);
+			char dateBuf[50];
+			snprintf(dateBuf, std::size(dateBuf), "%.2u:%.2u:%.2u.%.4u %s",
+				time.hours, time.minutes, time.seconds, time.fractions, tz.c_str());
+			return dateBuf;
+		}
+		case SQL_TIMESTAMP_TZ:
+		{
+			auto tsTzPtr = getTimestampTzPtr();
+			FbTimestamp ts{ 0, 0, 0, 0 };
+			std::string tz;
+			tz.reserve(30);
+			util->decodeTimeStampTz(&status, tsTzPtr,
+				&ts.year, &ts.month, &ts.day,
+				&ts.hours, &ts.minutes, &ts.seconds, &ts.fractions,
+				tz.capacity(), tz.data()
+			);
+			char dateBuf[80];
+			snprintf(dateBuf, std::size(dateBuf), "%.4u-%.2u-%.2u %.2u:%.2u:%.2u.%.4u %s",
+				ts.year, ts.month, ts.day,
+				ts.hours, ts.minutes, ts.seconds, ts.fractions,
+				tz.c_str()
+			);
+			return dateBuf;
+		}
+		case SQL_TIMESTAMP_TZ_EX:
+		{
+			auto tsTzExPtr = getTimestampTzExPtr();
+			FbTimestamp ts{ 0, 0, 0, 0 };
+			std::string tz;
+			tz.reserve(30);
+			util->decodeTimeStampTzEx(&status, tsTzExPtr,
+				&ts.year, &ts.month, &ts.day,
+				&ts.hours, &ts.minutes, &ts.seconds, &ts.fractions,
+				tz.capacity(), tz.data()
+			);
+			char dateBuf[80];
+			snprintf(dateBuf, std::size(dateBuf), "%.4u-%.2u-%.2u %.2u:%.2u:%.2u.%.4u %s",
+				ts.year, ts.month, ts.day,
+				ts.hours, ts.minutes, ts.seconds, ts.fractions,
+				tz.c_str()
+			);
 			return dateBuf;
 		}
 		default: {
@@ -822,6 +1049,58 @@ namespace FirebirdHelper {
 		}
 	}
 
+	std::vector<unsigned char> sqlda::getBinaryValue() const
+	{
+		switch (type) {
+		case SQL_TEXT: {
+			const unsigned char* b = getBinaryPtr();
+			return std::vector(b, b + length);
+		}
+		case SQL_VARYING: {
+			auto varBinary = getVarBinaryPtr();
+			return std::vector(varBinary->str, varBinary->str + varBinary->length);
+		}
+		case SQL_BOOLEAN:
+			return std::vector(buffer + offset, buffer + offset + sizeof(FB_BOOLEAN));
+		case SQL_SHORT:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_SHORT));
+		case SQL_LONG:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_LONG));
+		case SQL_INT64:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_INT64));
+		case SQL_INT128:
+			return std::vector(buffer + offset, buffer + offset + sizeof(FB_I128));
+		case SQL_FLOAT:
+			return std::vector(buffer + offset, buffer + offset + sizeof(float));
+		case SQL_DOUBLE:
+		case SQL_D_FLOAT:
+			return std::vector(buffer + offset, buffer + offset + sizeof(double));
+		case SQL_DEC16:
+			return std::vector(buffer + offset, buffer + offset + sizeof(FB_DEC16));
+		case SQL_DEC34:
+			return std::vector(buffer + offset, buffer + offset + sizeof(FB_DEC34));
+		case SQL_TYPE_DATE:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_DATE));
+		case SQL_TYPE_TIME:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_TIME));
+		case SQL_TIMESTAMP:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_TIMESTAMP));
+		case SQL_TIME_TZ:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_TIME_TZ));
+		case SQL_TIME_TZ_EX:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_TIME_TZ_EX));
+		case SQL_TIMESTAMP_TZ:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_TIMESTAMP_TZ));
+		case SQL_TIMESTAMP_TZ_EX:
+			return std::vector(buffer + offset, buffer + offset + sizeof(ISC_TIMESTAMP_TZ_EX));
+		default: {
+			std::string message = "Cannot convert value from ";
+			message += sqlTypeName();
+			message += " to byte*";
+			throw std::runtime_error(message);
+		}
+		}
+	}
 
 	const ISC_QUAD* sqlda::getQuadValuePtr() const
 	{

@@ -204,6 +204,26 @@ namespace FirebirdHelper {
         ISC_TIMESTAMP* getTimestampPtr();
         ISC_TIMESTAMP getTimestampValue() const;
         void setTimestampValue(const ISC_TIMESTAMP& value);
+        // TIME WITH TIME ZONE
+        const ISC_TIME_TZ* getTimeTzPtr() const;
+        ISC_TIME_TZ* getTimeTzPtr();
+        ISC_TIME_TZ getTimeTzValue() const;
+        void setTimeTzValue(const ISC_TIME_TZ& value);
+        // TIME WITH TIME ZONE EX
+        const ISC_TIME_TZ_EX* getTimeTzExPtr() const;
+        ISC_TIME_TZ_EX* getTimeTzExPtr();
+        ISC_TIME_TZ_EX getTimeTzExValue() const;
+        void setTimeTzExValue(const ISC_TIME_TZ_EX& value);
+        // TIMESTAMP WITH TIME ZONE
+        const ISC_TIMESTAMP_TZ* getTimestampTzPtr() const;
+        ISC_TIMESTAMP_TZ* getTimestampTzPtr();
+        ISC_TIMESTAMP_TZ getTimestampTzValue() const;
+        void setTimestampTzValue(const ISC_TIMESTAMP_TZ& value);
+        // TIMESTAMP WITH TIME ZONE EX
+        const ISC_TIMESTAMP_TZ_EX* getTimestampTzExPtr() const;
+        ISC_TIMESTAMP_TZ_EX* getTimestampTzExPtr();
+        ISC_TIMESTAMP_TZ_EX getTimestampTzExValue() const;
+        void setTimestampTzExValue(const ISC_TIMESTAMP_TZ_EX& value);
         // CHAR(N)
         const char* getCharPtr() const;
         char* getCharPtr();
@@ -219,6 +239,8 @@ namespace FirebirdHelper {
         // CHAR(N), VARCHAR(N)
         std::string getStringValue() const;
         void setStringValue(std::string_view value);
+        // BINARY(N), VARBINARY(N)
+        std::vector<unsigned char> getBinaryValue() const;
         // ISC_QUAD (BLOB)
         const ISC_QUAD* getQuadValuePtr() const;
         ISC_QUAD* getQuadValuePtr();
