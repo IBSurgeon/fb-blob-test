@@ -16,6 +16,9 @@
     <Filter Include="doc">
       <UniqueIdentifier>{aa1f6d7a-6f9c-4fec-9d04-b42fc934b682}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Bat files">
+      <UniqueIdentifier>{07b53a8d-6eef-48b0-b184-30d9191c37b1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -25,6 +28,9 @@
   <ItemGroup>
     <None Include="README.md">
       <Filter>doc</Filter>
+    </None>
+    <None Include="fb-inline-test.bat">
+      <Filter>Bat files</Filter>
     </None>
   </ItemGroup>
 </Project>
