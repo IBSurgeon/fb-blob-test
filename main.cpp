@@ -55,11 +55,11 @@ WHERE SHORT_BLOB IS TRUE
 SELECT
   BLOB_TEST.ID,
   CASE
-    WHEN OCTET_LENGTH(BLOB_TEST.CONTENT) <= 16384 AND CHAR_LENGTH(BLOB_TEST.CONTENT) <= 8191
+    WHEN CHAR_LENGTH(BLOB_TEST.CONTENT) <= 8191
     THEN CAST(BLOB_TEST.CONTENT AS VARCHAR(8191))
   END AS SHORT_CONTENT,
   CASE
-    WHEN OCTET_LENGTH(BLOB_TEST.CONTENT) > 16384 OR CHAR_LENGTH(BLOB_TEST.CONTENT) > 8191
+    WHEN CHAR_LENGTH(BLOB_TEST.CONTENT) > 8191
     THEN CONTENT
   END AS CONTENT
 FROM BLOB_TEST
@@ -91,7 +91,12 @@ FROM BLOB_TEST
         int64_t wire_roundtrips;
     };
 
-
+    struct FbBlobInfo {
+        int64_t blob_num_segments;
+        int64_t blob_max_segment;
+        int64_t blob_total_length;
+        short blob_type;
+    };
 
     enum class Read_Blob_Kind { ALL_BLOB, SHORT_BLOB, LONG_BLOB };
 
@@ -110,10 +115,17 @@ FROM BLOB_TEST
         }
     }
 
+    void getBlobStat(Firebird::ThrowStatusWrapper* status, Firebird::IBlob* blob, FbBlobInfo& stat);
+
 	std::string readBlob(Firebird::ThrowStatusWrapper* status, Firebird::IBlob* blob)
 	{
-		// todo: get blob size and preallocate string buffer
+		// get blob size and preallocate string buffer
+        FbBlobInfo blobInfo;
+        std::memset(&blobInfo, 0, sizeof(blobInfo));
+        getBlobStat(status, blob, blobInfo);
+
 		std::string s;
+        s.reserve(blobInfo.blob_total_length);
 		bool eof = false;
 		std::vector<char> vBuffer(MAX_SEGMENT_SIZE);
 		auto buffer = vBuffer.data();
@@ -216,6 +228,39 @@ FROM BLOB_TEST
         return result;
     }
 
+    void getBlobStat(Firebird::ThrowStatusWrapper* status, Firebird::IBlob* blob, FbBlobInfo& stat)
+    {
+        ISC_UCHAR buffer[1024];
+        const unsigned char info_options[] = {
+            isc_info_blob_num_segments, isc_info_blob_max_segment,
+            isc_info_blob_total_length, isc_info_blob_type,
+            isc_info_end };
+        blob->getInfo(status, sizeof(info_options), info_options, sizeof(buffer), buffer);
+        /* Extract the values returned in the result buffer. */
+        for (ISC_UCHAR* p = buffer; *p != isc_info_end; ) {
+            const unsigned char item = *p++;
+            const ISC_SHORT length = static_cast<ISC_SHORT>(portable_integer(p, 2));
+            p += 2;
+            switch (item) {
+            case isc_info_blob_num_segments:
+                stat.blob_num_segments = portable_integer(p, length);
+                break;
+            case isc_info_blob_max_segment:
+                stat.blob_max_segment = portable_integer(p, length);
+                break;
+            case isc_info_blob_total_length:
+                stat.blob_total_length = portable_integer(p, length);
+                break;
+            case isc_info_blob_type:
+                stat.blob_type = static_cast<short>(portable_integer(p, length));
+                break;
+            default:
+                break;
+            }
+            p += length;
+        };
+    }
+
     class WireStartCollector
     {
     private:
@@ -276,6 +321,8 @@ FROM BLOB_TEST
 
         Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
+        std::cout << "SQL:" << std::endl << SQL_CACHE_WARMING << std::endl;
+
         Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, SQL_CACHE_WARMING, 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         Firebird::AutoRelease<Firebird::IMessageMetadata> inMetadata = stmt->getInputMetadata(status);
@@ -314,7 +361,10 @@ FROM BLOB_TEST
 	/// <param name="status">Status</param>
 	/// <param name="att">Database attachment</param>
     /// <param name="readBlobKind"></param>
-	void testWithoutReadBlob(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, std::optional<unsigned short> max_inline_blob_size = {})
+    /// <param name="max_inline_blob_size"></param>
+    /// <param name="limit_rows"></param>
+	void testReadBlobId(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
+        std::optional<unsigned short> max_inline_blob_size = {}, std::optional<uint64_t> limit_rows = {})
 	{
 		using std::chrono::duration_cast;
 		using std::chrono::high_resolution_clock;
@@ -324,9 +374,13 @@ FROM BLOB_TEST
 
 		Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
-        const char* sql = sql_for_blob_read_kind(readBlobKind);
+        std::string sql = sql_for_blob_read_kind(readBlobKind);
+        if (limit_rows.has_value()) {
+            sql += std::format("FETCH FIRST {} ROWS ONLY \n", limit_rows.value());
+        }
+        std::cout << "SQL:" << std::endl << sql << std::endl;
 
-		Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql, 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
+		Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         if (stmt->cloopVTable->version >= stmt->VERSION) {
             if (max_inline_blob_size.has_value()) {
@@ -382,7 +436,10 @@ FROM BLOB_TEST
 	/// <param name="status">Status</param>
 	/// <param name="att">Database attachment</param>
 	/// <param name="readBlobKind"></param>
-    void testWithReadBlob(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, std::optional<unsigned short> max_inline_blob_size = {})
+    /// <param name="max_inline_blob_size"></param>
+    /// <param name="limit_rows"></param>
+    void testWithReadBlob(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
+        std::optional<unsigned short> max_inline_blob_size = {}, std::optional<uint64_t> limit_rows = {})
 	{
 		using std::chrono::duration_cast;
 		using std::chrono::high_resolution_clock;
@@ -392,9 +449,13 @@ FROM BLOB_TEST
 
 		Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
-        const char* sql = sql_for_blob_read_kind(readBlobKind);
+        std::string sql = sql_for_blob_read_kind(readBlobKind);
+        if (limit_rows.has_value()) {
+            sql += std::format("FETCH FIRST {} ROWS ONLY \n", limit_rows.value());
+        }
+        std::cout << "SQL:" << std::endl << sql << std::endl;
 
-		Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql, 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
+		Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         if (stmt->cloopVTable->version >= stmt->VERSION) {
             if (max_inline_blob_size.has_value()) {
@@ -459,7 +520,7 @@ FROM BLOB_TEST
     /// </summary>
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
-    void testReadVarchar(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att)
+    void testReadVarchar(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, std::optional<uint64_t> limit_rows = {})
     {
         using std::chrono::duration_cast;
         using std::chrono::high_resolution_clock;
@@ -469,7 +530,13 @@ FROM BLOB_TEST
 
         Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
-        Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, SQL_VARCHAR_READ, 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
+        std::string sql = SQL_VARCHAR_READ;
+        if (limit_rows.has_value()) {
+            sql += std::format("FETCH FIRST {} ROWS ONLY \n", limit_rows.value());
+        }
+        std::cout << "SQL:" << std::endl << sql << std::endl;
+
+        Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         Firebird::AutoRelease<Firebird::IMessageMetadata> inMetadata = stmt->getInputMetadata(status);
         Firebird::AutoRelease<Firebird::IMessageMetadata> outMetadata = stmt->getOutputMetadata(status);
@@ -522,7 +589,7 @@ FROM BLOB_TEST
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
     /// <param name="optimize"></param>
-    void testMixedRead(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, bool optimize)
+    void testMixedRead(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, bool optimize, std::optional<uint64_t> limit_rows = {})
     {
         using std::chrono::duration_cast;
         using std::chrono::high_resolution_clock;
@@ -532,9 +599,13 @@ FROM BLOB_TEST
 
         Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
-        const char* sql = optimize ? SQL_MIXED_OPT_READ : SQL_MIXED_READ;
+        std::string sql = optimize ? SQL_MIXED_OPT_READ : SQL_MIXED_READ;
+        if (limit_rows.has_value()) {
+            sql += std::format("FETCH FIRST {} ROWS ONLY \n", limit_rows.value());
+        }
+        std::cout << "SQL:" << std::endl << sql << std::endl;
 
-        Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql, 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
+        Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         if (stmt->cloopVTable->version >= stmt->VERSION) {
             std::cout << std::format("MaxInlineBlobSize = {}", stmt->getMaxInlineBlobSize(status)) << std::endl;
@@ -605,10 +676,10 @@ FROM BLOB_TEST
 		}
 	};
 
-	enum class OptState { NONE, DATABASE, USERNAME, PASSWORD, CHARSET, DIALECT, MAX_INLINE_BLOB_SIZE };
+	enum class OptState { NONE, DATABASE, USERNAME, PASSWORD, CHARSET, MAX_INLINE_BLOB_SIZE, ROWS_LIMIT };
 
 	constexpr char HELP_INFO[] = R"(
-Usage fbcpp-inline-blob [<database>] <options>
+Usage fb-blob-test [<database>] <options>
 General options:
     -h [ --help ]                        Show help
 
@@ -618,8 +689,8 @@ Database options:
     -p [ --password ] password           Password
     -c [ --charset ] charset             Character set, default UTF8
     -z [ --compress ]                    Wire compression, default False
+    -n [ --limit-rows ] value            Limit of rows
     -i [ --max-inline-blob-size ] value  Maximum inline blob size, default 65535
-    -s [ --sql-dialect ] dialect         SQL dialect, default 3
 )";
 
     class TestApp final
@@ -629,8 +700,8 @@ Database options:
         std::string m_username { "SYSDBA"};
         std::string m_password { "masterkey" };
         std::string m_charset{ "UTF8" };
-        unsigned short m_sqlDialect = 3;
         std::optional<unsigned short> m_max_inline_blob_size;
+        std::optional<uint64_t> m_limit_rows;
         bool m_wireCompression = false;
     public:
         int exec(int argc, const char** argv);
@@ -681,11 +752,11 @@ Database options:
                 case 'c':
                     st = OptState::CHARSET;
                     break;
-                case 's':
-                    st = OptState::DIALECT;
-                    break;
                 case 'i':
                     st = OptState::MAX_INLINE_BLOB_SIZE;
+                    break;
+                case 'n':
+                    st = OptState::ROWS_LIMIT;
                     break;
                 case 'z':
                     m_wireCompression = true;
@@ -718,12 +789,12 @@ Database options:
                     st = OptState::CHARSET;
                     continue;
                 }
-                if (arg == "--sql-dialect") {
-                    st = OptState::DIALECT;
-                    continue;
-                }
                 if (arg == "--max-inline-blob-size") {
                     st = OptState::MAX_INLINE_BLOB_SIZE;
+                    continue;
+                }
+                if (arg == "--limit-rows") {
+                    st = OptState::ROWS_LIMIT;
                     continue;
                 }
                 if (arg == "--compress") {
@@ -746,18 +817,14 @@ Database options:
                     m_charset.assign(arg.substr(10));
                     continue;
                 }
-                if (auto pos = arg.find("--sql-dialect="); pos == 0) {
-                    std::string sql_dialect = arg.substr(14);
-                    m_sqlDialect = static_cast<unsigned short>(std::stoi(sql_dialect));
-                    if (m_sqlDialect != 1 && m_sqlDialect != 3) {
-                        std::cerr << "Error: sql_dialect must be 1 or 3" << std::endl;
-                        exit(-1);
-                    }
-                    continue;
-                }
                 if (auto pos = arg.find("--max-inline-blob-size="); pos == 0) {
                     std::string s_inline_size = arg.substr(23);
                     m_max_inline_blob_size = static_cast<unsigned short>(std::stoi(s_inline_size));
+                    continue;
+                }
+                if (auto pos = arg.find("--limit-rows="); pos == 0) {
+                    std::string s_limit_rows = arg.substr(14);
+                    m_limit_rows = static_cast<uint64_t>(std::stoull(s_limit_rows));
                     continue;
                 }
                 std::cerr << "Error: unrecognized option '" << arg << "'. See: --help" << std::endl;
@@ -782,15 +849,11 @@ Database options:
                 case OptState::CHARSET:
                     m_charset.assign(arg);
                     break;
-                case OptState::DIALECT:
-                    m_sqlDialect = static_cast<unsigned short>(std::stoi(arg));
-                    if (m_sqlDialect != 1 && m_sqlDialect != 3) {
-                        std::cerr << "Error: sql_dialect must be 1 or 3" << std::endl;
-                        exit(-1);
-                    }
-                    break;
                 case OptState::MAX_INLINE_BLOB_SIZE:
                     m_max_inline_blob_size = static_cast<unsigned short>(std::stoi(arg));
+                    break;
+                case OptState::ROWS_LIMIT:
+                    m_limit_rows = static_cast<uint64_t>(std::stoull(arg));
                     break;
                 default:
                     continue;
@@ -803,8 +866,9 @@ Database options:
         }
     }
 
-    int TestApp::run() {
-        std::cout << "====== Blob inline test ======" << std::endl << std::endl;
+    int TestApp::run() 
+    {
+        std::cout << "===== Test of BLOBs transmission over the network =====" << std::endl << std::endl;
 
         Firebird::AutoDispose<Firebird::IStatus> st = master->getStatus();
         Firebird::IUtil* util = master->getUtilInterface();
@@ -830,27 +894,34 @@ Database options:
             util->getFbVersion(&status, att, &vCallback);
 
             std::cout << std::endl << "** Warming up the cache **" << std::endl;
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
             cacheWarmingUp(&status, att);
 
             std::cout << std::endl << "** Test read short BLOBs **" << std::endl;
-            testWithReadBlob(&status, att, Read_Blob_Kind::SHORT_BLOB, m_max_inline_blob_size);
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
+            testWithReadBlob(&status, att, Read_Blob_Kind::SHORT_BLOB, m_max_inline_blob_size, m_limit_rows);
 
             std::cout << std::endl << "** Test read VARCHAR(8191) **" << std::endl;
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
             testReadVarchar(&status, att);
 
             std::cout << std::endl << "** Test read all BLOBs **" << std::endl;
-            testWithReadBlob(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size);
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
+            testWithReadBlob(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size, m_limit_rows);
 
             std::cout << std::endl << "** Test read mixed BLOBs and VARCHARs **" << std::endl;
-            testMixedRead(&status, att, false);
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
+            testMixedRead(&status, att, false, m_limit_rows);
 
             std::cout << std::endl << "** Test read mixed BLOBs and VARCHARs with optimize **" << std::endl;
-            testMixedRead(&status, att, true);
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
+            testMixedRead(&status, att, true, m_limit_rows);
 
             if (att->cloopVTable->version >= att->VERSION) {
                 // The test only makes sense for Firebird 5.0.3+
                 std::cout << std::endl << "** Test read only BLOB IDs **" << std::endl;
-                testWithoutReadBlob(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size);
+                std::cout << "------------------------------------------------------------------------------------" << std::endl;
+                testReadBlobId(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size, m_limit_rows);
             }
 
             att->detach(&status);

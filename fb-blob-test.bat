@@ -21,6 +21,6 @@ if not [%MAX_INLINE_BLOB_SIZE%]==[] set FB_OPT=%FB_OPT% -i %MAX_INLINE_BLOB_SIZE
 echo Database: %DB_URI%
 echo Options: %FB_OPT%
 
-fbcpp-inline-blob -d %DB_URI% -u %FB_USER% -p %FB_PASSWORD% %FB_OPT%
+fb-blob-test -d %DB_URI% -u %FB_USER% -p %FB_PASSWORD% %FB_OPT%
 
 pause
