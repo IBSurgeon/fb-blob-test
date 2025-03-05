@@ -299,3 +299,7 @@ Wire physical statistics:
   recv bytes = 13489405
   roundtrips = 90
 ```
+
+# Скачать утилиту для тестирования и БД
+
+https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb-blob-test.zip
