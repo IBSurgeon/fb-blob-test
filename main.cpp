@@ -917,12 +917,11 @@ Database options:
             std::cout << "------------------------------------------------------------------------------------" << std::endl;
             testMixedRead(&status, att, true, m_limit_rows);
 
-            if (att->cloopVTable->version >= att->VERSION) {
-                // The test only makes sense for Firebird 5.0.3+
-                std::cout << std::endl << "** Test read only BLOB IDs **" << std::endl;
-                std::cout << "------------------------------------------------------------------------------------" << std::endl;
-                testReadBlobId(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size, m_limit_rows);
-            }
+
+            std::cout << std::endl << "** Test read only BLOB IDs **" << std::endl;
+            std::cout << "------------------------------------------------------------------------------------" << std::endl;
+            testReadBlobId(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size, m_limit_rows);
+
 
             att->detach(&status);
             att.release();
