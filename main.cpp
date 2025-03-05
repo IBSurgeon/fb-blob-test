@@ -9,9 +9,9 @@
 
 namespace {
 
-	static Firebird::IMaster* master = Firebird::fb_get_master_interface();
+    static Firebird::IMaster* master = Firebird::fb_get_master_interface();
 
-	constexpr unsigned int MAX_SEGMENT_SIZE = 65535;
+    constexpr unsigned int MAX_SEGMENT_SIZE = 65535;
     constexpr size_t MEGABYTE = 1024 * 1024;
 
     constexpr const char* SQL_CACHE_WARMING = R"(
@@ -20,7 +20,7 @@ SELECT
 FROM BLOB_TEST
 )";
 
-	constexpr const char* SQL_ALL_BLOB_READ = R"(
+    constexpr const char* SQL_ALL_BLOB_READ = R"(
 SELECT
   ID,
   CONTENT
@@ -117,34 +117,34 @@ FROM BLOB_TEST
 
     void getBlobStat(Firebird::ThrowStatusWrapper* status, Firebird::IBlob* blob, FbBlobInfo& stat);
 
-	std::string readBlob(Firebird::ThrowStatusWrapper* status, Firebird::IBlob* blob)
-	{
-		// get blob size and preallocate string buffer
+    std::string readBlob(Firebird::ThrowStatusWrapper* status, Firebird::IBlob* blob)
+    {
+        // get blob size and preallocate string buffer
         FbBlobInfo blobInfo;
         std::memset(&blobInfo, 0, sizeof(blobInfo));
         getBlobStat(status, blob, blobInfo);
 
-		std::string s;
+        std::string s;
         s.reserve(blobInfo.blob_total_length);
-		bool eof = false;
-		std::vector<char> vBuffer(MAX_SEGMENT_SIZE);
-		auto buffer = vBuffer.data();
-		while (!eof) {
-			unsigned int l = 0;
-			switch (blob->getSegment(status, MAX_SEGMENT_SIZE, buffer, &l))
-			{
-			case Firebird::IStatus::RESULT_OK:
-			case Firebird::IStatus::RESULT_SEGMENT:
-				s.append(buffer, l);
-				break;
-			default:
-				eof = true;
-				break;
-			}
-		}
+        bool eof = false;
+        std::vector<char> vBuffer(MAX_SEGMENT_SIZE);
+        auto buffer = vBuffer.data();
+        while (!eof) {
+            unsigned int l = 0;
+            switch (blob->getSegment(status, MAX_SEGMENT_SIZE, buffer, &l))
+            {
+            case Firebird::IStatus::RESULT_OK:
+            case Firebird::IStatus::RESULT_SEGMENT:
+                s.append(buffer, l);
+                break;
+            default:
+                eof = true;
+                break;
+            }
+        }
 
-		return s;
-	}
+        return s;
+    }
 
     int64_t portable_integer(const unsigned char* ptr, short length)
     {
@@ -355,24 +355,24 @@ FROM BLOB_TEST
         tra.release();
     }
 
-	/// <summary>
-	/// Test reading only identifiers BLOB.
-	/// </summary>
-	/// <param name="status">Status</param>
-	/// <param name="att">Database attachment</param>
+    /// <summary>
+    /// Test reading only identifiers BLOB.
+    /// </summary>
+    /// <param name="status">Status</param>
+    /// <param name="att">Database attachment</param>
     /// <param name="readBlobKind"></param>
     /// <param name="max_inline_blob_size"></param>
     /// <param name="limit_rows"></param>
-	void testReadBlobId(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
+    void testReadBlobId(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
         std::optional<unsigned short> max_inline_blob_size = {}, std::optional<uint64_t> limit_rows = {})
-	{
-		using std::chrono::duration_cast;
-		using std::chrono::high_resolution_clock;
-		using std::chrono::milliseconds;
+    {
+        using std::chrono::duration_cast;
+        using std::chrono::high_resolution_clock;
+        using std::chrono::milliseconds;
 
-		unsigned char tpb[] = { isc_tpb_version1, isc_tpb_read, isc_tpb_read_committed, isc_tpb_read_consistency };
+        unsigned char tpb[] = { isc_tpb_version1, isc_tpb_read, isc_tpb_read_committed, isc_tpb_read_consistency };
 
-		Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
+        Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
         std::string sql = sql_for_blob_read_kind(readBlobKind);
         if (limit_rows.has_value()) {
@@ -380,7 +380,7 @@ FROM BLOB_TEST
         }
         std::cout << "SQL:" << std::endl << sql << std::endl;
 
-		Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
+        Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         if (stmt->cloopVTable->version >= stmt->VERSION) {
             if (max_inline_blob_size.has_value()) {
@@ -389,65 +389,65 @@ FROM BLOB_TEST
             std::cout << std::format("MaxInlineBlobSize = {}", stmt->getMaxInlineBlobSize(status)) << std::endl;
         }
 
-		Firebird::AutoRelease<Firebird::IMessageMetadata> inMetadata = stmt->getInputMetadata(status);
-		Firebird::AutoRelease<Firebird::IMessageMetadata> outMetadata = stmt->getOutputMetadata(status);
+        Firebird::AutoRelease<Firebird::IMessageMetadata> inMetadata = stmt->getInputMetadata(status);
+        Firebird::AutoRelease<Firebird::IMessageMetadata> outMetadata = stmt->getOutputMetadata(status);
 
         WireStartCollector wireStatCollector;
 
-		auto t0 = high_resolution_clock::now();
+        auto t0 = high_resolution_clock::now();
 
         wireStatCollector.startStatCollect(status, att);
 
-		Firebird::AutoRelease<Firebird::IResultSet> rs = stmt->openCursor(status, tra, inMetadata, nullptr, outMetadata, 0);
+        Firebird::AutoRelease<Firebird::IResultSet> rs = stmt->openCursor(status, tra, inMetadata, nullptr, outMetadata, 0);
 
-		FB_MESSAGE(OutMessage, Firebird::ThrowStatusWrapper,
-			(FB_BIGINT, id)
-			(FB_BLOB, content)
-		) out(status, master);
+        FB_MESSAGE(OutMessage, Firebird::ThrowStatusWrapper,
+            (FB_BIGINT, id)
+            (FB_BLOB, content)
+        ) out(status, master);
 
-		int64_t max_id = 0;
+        int64_t max_id = 0;
         int64_t record_count = 0;
-		while (rs->fetchNext(status, out.getData()) == Firebird::IStatus::RESULT_OK) {
+        while (rs->fetchNext(status, out.getData()) == Firebird::IStatus::RESULT_OK) {
             max_id = std::max<int64_t>(max_id, out->id);
             ++record_count;
-		}
+        }
         wireStatCollector.endStatCollect(status, att);
 
-		auto t1 = high_resolution_clock::now();
-		auto elapsed = duration_cast<milliseconds>(t1 - t0);
-		std::cout << std::format("Elapsed time: {}", elapsed) << std::endl;
-		std::cout << "Max id: " << max_id << std::endl;
+        auto t1 = high_resolution_clock::now();
+        auto elapsed = duration_cast<milliseconds>(t1 - t0);
+        std::cout << std::format("Elapsed time: {}", elapsed) << std::endl;
+        std::cout << "Max id: " << max_id << std::endl;
         std::cout << "Record count: " << record_count << std::endl;
         wireStatCollector.printWireStat();
 
-		rs->close(status);
-		rs.release();
+        rs->close(status);
+        rs.release();
 
-		stmt->free(status);
-		stmt.release();
+        stmt->free(status);
+        stmt.release();
 
-		tra->commit(status);
-		tra.release();
-	}
+        tra->commit(status);
+        tra.release();
+    }
 
-	/// <summary>
-	/// Test reading BLOBs.
-	/// </summary>
-	/// <param name="status">Status</param>
-	/// <param name="att">Database attachment</param>
-	/// <param name="readBlobKind"></param>
+    /// <summary>
+    /// Test reading BLOBs.
+    /// </summary>
+    /// <param name="status">Status</param>
+    /// <param name="att">Database attachment</param>
+    /// <param name="readBlobKind"></param>
     /// <param name="max_inline_blob_size"></param>
     /// <param name="limit_rows"></param>
     void testWithReadBlob(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
         std::optional<unsigned short> max_inline_blob_size = {}, std::optional<uint64_t> limit_rows = {})
-	{
-		using std::chrono::duration_cast;
-		using std::chrono::high_resolution_clock;
-		using std::chrono::milliseconds;
+    {
+        using std::chrono::duration_cast;
+        using std::chrono::high_resolution_clock;
+        using std::chrono::milliseconds;
 
-		unsigned char tpb[] = { isc_tpb_version1, isc_tpb_read, isc_tpb_read_committed, isc_tpb_read_consistency };
+        unsigned char tpb[] = { isc_tpb_version1, isc_tpb_read, isc_tpb_read_committed, isc_tpb_read_consistency };
 
-		Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
+        Firebird::AutoRelease<Firebird::ITransaction> tra = att->startTransaction(status, std::size(tpb), tpb);
 
         std::string sql = sql_for_blob_read_kind(readBlobKind);
         if (limit_rows.has_value()) {
@@ -455,7 +455,7 @@ FROM BLOB_TEST
         }
         std::cout << "SQL:" << std::endl << sql << std::endl;
 
-		Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
+        Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         if (stmt->cloopVTable->version >= stmt->VERSION) {
             if (max_inline_blob_size.has_value()) {
@@ -464,56 +464,56 @@ FROM BLOB_TEST
             std::cout << std::format("MaxInlineBlobSize = {}", stmt->getMaxInlineBlobSize(status)) << std::endl;
         }
 
-		Firebird::AutoRelease<Firebird::IMessageMetadata> inMetadata = stmt->getInputMetadata(status);
-		Firebird::AutoRelease<Firebird::IMessageMetadata> outMetadata = stmt->getOutputMetadata(status);
+        Firebird::AutoRelease<Firebird::IMessageMetadata> inMetadata = stmt->getInputMetadata(status);
+        Firebird::AutoRelease<Firebird::IMessageMetadata> outMetadata = stmt->getOutputMetadata(status);
 
         WireStartCollector wireStatCollector;
 
-		auto t0 = high_resolution_clock::now();
+        auto t0 = high_resolution_clock::now();
 
         wireStatCollector.startStatCollect(status, att);
 
-		Firebird::AutoRelease<Firebird::IResultSet> rs = stmt->openCursor(status, tra, inMetadata, nullptr, outMetadata, 0);
+        Firebird::AutoRelease<Firebird::IResultSet> rs = stmt->openCursor(status, tra, inMetadata, nullptr, outMetadata, 0);
 
-		FB_MESSAGE(OutMessage, Firebird::ThrowStatusWrapper,
-			(FB_BIGINT, id)
-			(FB_BLOB, content)
-		) out(status, master);
+        FB_MESSAGE(OutMessage, Firebird::ThrowStatusWrapper,
+            (FB_BIGINT, id)
+            (FB_BLOB, content)
+        ) out(status, master);
 
         int64_t max_id = 0;
-		size_t blb_size = 0;
+        size_t blb_size = 0;
         int64_t record_count = 0;
-		while (rs->fetchNext(status, out.getData()) == Firebird::IStatus::RESULT_OK) {
+        while (rs->fetchNext(status, out.getData()) == Firebird::IStatus::RESULT_OK) {
             max_id = std::max<int64_t>(max_id, out->id);
             ++record_count;
 
-			Firebird::AutoRelease<Firebird::IBlob> blob = att->openBlob(status, tra, &out->content, 0, nullptr);
-			auto s = readBlob(status, blob);
-			blob->close(status);
-			blob.release();
+            Firebird::AutoRelease<Firebird::IBlob> blob = att->openBlob(status, tra, &out->content, 0, nullptr);
+            auto s = readBlob(status, blob);
+            blob->close(status);
+            blob.release();
 
-			blb_size += s.size();
-		}
+            blb_size += s.size();
+        }
 
         wireStatCollector.endStatCollect(status, att);
 
-		auto t1 = high_resolution_clock::now();
-		auto elapsed = duration_cast<milliseconds>(t1 - t0);
-		std::cout << std::format("Elapsed time: {}", elapsed) << std::endl;
-		std::cout << "Max id: " << max_id << std::endl;
+        auto t1 = high_resolution_clock::now();
+        auto elapsed = duration_cast<milliseconds>(t1 - t0);
+        std::cout << std::format("Elapsed time: {}", elapsed) << std::endl;
+        std::cout << "Max id: " << max_id << std::endl;
         std::cout << "Record count: " << record_count << std::endl;
-		std::cout << "Content size: " << blb_size << " bytes" << std::endl;
+        std::cout << "Content size: " << blb_size << " bytes" << std::endl;
         wireStatCollector.printWireStat();
 
-		rs->close(status);
-		rs.release();
+        rs->close(status);
+        rs.release();
 
-		stmt->free(status);
-		stmt.release();
+        stmt->free(status);
+        stmt.release();
 
-		tra->commit(status);
-		tra.release();
-	}
+        tra->commit(status);
+        tra.release();
+    }
 
     /// <summary>
     /// Test reading VARCHARs.
@@ -668,17 +668,17 @@ FROM BLOB_TEST
         tra.release();
     }
 
-	struct VCallback : public Firebird::IVersionCallbackImpl<VCallback, Firebird::ThrowStatusWrapper>
-	{
-		void callback(Firebird::ThrowStatusWrapper* status, const char* text) override
-		{
-			std::cout << text << std::endl;
-		}
-	};
+    struct VCallback : public Firebird::IVersionCallbackImpl<VCallback, Firebird::ThrowStatusWrapper>
+    {
+        void callback(Firebird::ThrowStatusWrapper* status, const char* text) override
+        {
+            std::cout << text << std::endl;
+        }
+    };
 
-	enum class OptState { NONE, DATABASE, USERNAME, PASSWORD, CHARSET, MAX_INLINE_BLOB_SIZE, ROWS_LIMIT };
+    enum class OptState { NONE, DATABASE, USERNAME, PASSWORD, CHARSET, MAX_INLINE_BLOB_SIZE, ROWS_LIMIT };
 
-	constexpr char HELP_INFO[] = R"(
+    constexpr char HELP_INFO[] = R"(
 Usage fb-blob-test [<database>] <options>
 General options:
     -h [ --help ]                        Show help
