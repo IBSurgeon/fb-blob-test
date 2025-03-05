@@ -7,6 +7,7 @@ set DATABASE=blob_test
 set FB_OPT=
 set COMPRESSION=1
 set MAX_INLINE_BLOB_SIZE=
+set LIMIT_ROWS=1000
 
 set DB_URI=inet://%FB_HOST%
 
@@ -17,6 +18,7 @@ set DB_URI=%DB_URI%/%DATABASE%
 if %COMPRESSION% equ 1 set FB_OPT=%FB_OPT% -z
 
 if not [%MAX_INLINE_BLOB_SIZE%]==[] set FB_OPT=%FB_OPT% -i %MAX_INLINE_BLOB_SIZE%
+if not [%LIMIT_ROWS%]==[] set FB_OPT=%FB_OPT% -n %LIMIT_ROWS%
 
 echo Database: %DB_URI%
 echo Options: %FB_OPT%
