@@ -1,0 +1,53 @@
+[[fb-wire-blobs]]
+= Передача BLOB по сети в Firebird
+Симонов Денис
+v0.1 от 05.03.2025
+:doctype: book
+:sectnums:
+:sectanchors:
+:toc: left
+:toclevels: 4
+:outlinelevels: 6:0
+:icons: font
+:experimental:
+:lang: ru
+:imagesdir: images
+:toc-title: Содержание
+:chapter-label: Глава
+:example-caption: Пример
+:figure-caption: Рисунок
+:table-caption: Таблица
+:note-caption: Примечание
+:caution-caption: Внимание
+:important-caption: Важно
+:warning-caption: Предупреждение
+:version-label: Версия
+ifdef::backend-pdf[]
+:pdf-fontsdir: theme/fonts
+:pdf-themesdir: theme/firebird-pdf
+:pdf-theme: firebird
+:source-highlighter: pygments
+endif::[]
+ifdef::backend-html5[]
+:stylesdir: theme/firebird-html
+:stylesheet: firebird.css
+:source-highlighter: highlight.js
+endif::[]
+
+[dedication%notitle]
+--
+Этот материал был создан при поддержке и спонсорстве компании https://www.ibase.ru[iBase.ru], которая разрабатывает  инструменты Firebird SQL для предприятий и предоставляет сервис технической поддержки для Firebird SQL.
+
+Материал выпущен под лицензией Public Documentation License https://www.firebirdsql.org/file/documentation/html/en/licenses/pdl/public-documentation-license.html
+--
+
+toc::[]
+
+[preface]
+== Предисловие
+
+У разработчиков приложений, а также администраторов, использующий СУБД Firebird часто возникает вопрос, а что если разместить СУБД Firebird в облаке и работать с ней через интернет канал? Однако, после тестирования такого режима работы многие остаются разочарованными, поскольку скорость обмена данными по сети с высокой латентностью (интернет канал) оставляет желать лучшего. В большинстве случаев скорость выборки данных из курсоров, порождённых SQL запросами устраивает, но как только в таких запросах встречаются BLOB поля (бинарные или тестовые данные) скорость передачи данных падает катастрофически.
+
+В данной статье мы поговорим о том как передаются BLOB по сети, какие проблемы возникают у пользователей в случае использования Firebird в сетях с высокой латентностью (работа через интернет канал), расскажем о способах решения этих проблем, а также об улучшениях в передачи BLOB в последних версиях Firebird (5.0.2 и 5.0.3).
+
+Для демонстрации различных способов работы с BLOB полями, а также замеров производительности было написано небольшое тестовое приложение исходные коды которого доступны по адресу (https://github.com/sim1984/fb-blob-test).

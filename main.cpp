@@ -902,7 +902,7 @@ Database options:
 
             std::cout << std::endl << "** Test read VARCHAR(8191) **" << std::endl;
             std::cout << "------------------------------------------------------------------------------------" << std::endl;
-            testReadVarchar(&status, att);
+            testReadVarchar(&status, att, m_limit_rows);
 
             std::cout << std::endl << "** Test read all BLOBs **" << std::endl;
             std::cout << "------------------------------------------------------------------------------------" << std::endl;
