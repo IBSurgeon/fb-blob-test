@@ -51,8 +51,7 @@ BEGIN
     BEGIN
       I = I + 1;
       -- BLOB помещается в строковую переменную 8191
-      -- и его размер в байтах меньше inline-blob 16384
-      IS_SHORT = (C.CH_L < 8191) AND (C.OC_L < 16384);
+      IS_SHORT = (C.CH_L < 8191);
 
       INSERT INTO BLOB_TEST (
         SHORT_CONTENT,
