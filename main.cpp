@@ -871,11 +871,10 @@ Database options:
         std::cout << "===== Test of BLOBs transmission over the network =====" << std::endl << std::endl;
 
         Firebird::AutoDispose<Firebird::IStatus> st = master->getStatus();
+        Firebird::ThrowStatusWrapper status(st);
         Firebird::IUtil* util = master->getUtilInterface();
         try {
-            Firebird::ThrowStatusWrapper status(st);
             Firebird::AutoRelease<Firebird::IProvider> provider = master->getDispatcher();
-
             Firebird::AutoDispose<Firebird::IXpbBuilder> dpbBuilder = util->getXpbBuilder(&status, Firebird::IXpbBuilder::DPB, nullptr, 0);
             dpbBuilder->insertString(&status, isc_dpb_user_name, m_username.c_str());
             dpbBuilder->insertString(&status, isc_dpb_password, m_password.c_str());
@@ -927,11 +926,10 @@ Database options:
             att.release();
         }
         catch (const Firebird::FbException& e) {
-            std::string msg;
-            msg.reserve(2048);
-            util->formatStatus(msg.data(), static_cast<unsigned int>(msg.capacity()), e.getStatus());
-            std::cout << msg << std::endl;
-            return -1;
+            char message_buffer[2048];
+            master->getUtilInterface()->formatStatus(message_buffer, static_cast<unsigned int>(std::size(message_buffer)), e.getStatus());
+            std::cerr << "Error: " << message_buffer << std::endl;
+            return 1;
         }
         return 0;
     }
