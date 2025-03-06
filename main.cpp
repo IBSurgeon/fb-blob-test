@@ -360,9 +360,9 @@ FROM BLOB_TEST
     /// </summary>
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
-    /// <param name="readBlobKind"></param>
-    /// <param name="max_inline_blob_size"></param>
-    /// <param name="limit_rows"></param>
+    /// <param name="readBlobKind">What types of blobs to read: all, short, long</param>
+    /// <param name="max_inline_blob_size">Max size of inline BLOB</param>
+    /// <param name="limit_rows">Limit on the number of rows returned by a query</param>
     void testReadBlobId(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
         std::optional<unsigned short> max_inline_blob_size = {}, std::optional<uint64_t> limit_rows = {})
     {
@@ -435,9 +435,9 @@ FROM BLOB_TEST
     /// </summary>
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
-    /// <param name="readBlobKind"></param>
-    /// <param name="max_inline_blob_size"></param>
-    /// <param name="limit_rows"></param>
+    /// <param name="readBlobKind">What types of blobs to read: all, short, long</param>
+    /// <param name="max_inline_blob_size">Max size of inline BLOB</param>
+    /// <param name="limit_rows">Limit on the number of rows returned by a query</param>
     void testWithReadBlob(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, Read_Blob_Kind readBlobKind, 
         std::optional<unsigned short> max_inline_blob_size = {}, std::optional<uint64_t> limit_rows = {})
     {
@@ -520,6 +520,7 @@ FROM BLOB_TEST
     /// </summary>
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
+    /// <param name="limit_rows">Limit on the number of rows returned by a query</param>
     void testReadVarchar(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, std::optional<uint64_t> limit_rows = {})
     {
         using std::chrono::duration_cast;
@@ -588,7 +589,9 @@ FROM BLOB_TEST
     /// </summary>
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
-    /// <param name="optimize"></param>
+    /// <param name="optimize">Flag for selecting SQL query</param>
+    /// <param name="max_inline_blob_size">Max size of inline BLOB</param>
+    /// <param name="limit_rows">Limit on the number of rows returned by a query</param>
     void testMixedRead(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, bool optimize, 
         std::optional<unsigned short> max_inline_blob_size = {}, 
         std::optional<uint64_t> limit_rows = {})
