@@ -15,7 +15,7 @@ ALTER TABLE BLOB_SAMPLE ADD PRIMARY KEY (ID);
 ALTER TABLE BLOB_SAMPLE ADD UNIQUE (FILE_NAME);
 ```
 
-В данной библиотеке не так много файлов, поэтому масштабируем их количество перезалив BLOB в другую таблицу. Заодно добавим туда дополнительные поля.
+Поскольку проект не большой, то количество файлов с исходными текстами в нём не так много как хотелось бы. Чтобы результаты тестирования были более наглядны в цифрах, доведём количество записей с BLOB до 10000. Для этого создадим отдельную таблицу `BLOB_TEST` со следующей структурой:
 
 ```sql
 RECREATE TABLE BLOB_TEST (
@@ -23,11 +23,11 @@ RECREATE TABLE BLOB_TEST (
     SHORT_CONTENT  VARCHAR(8191) CHARACTER SET UTF8,
     CONTENT        BLOB SUB_TYPE TEXT CHARACTER SET UTF8,
     SHORT_BLOB     BOOLEAN DEFAULT FALSE NOT NULL,
-	CONSTRAINT PK_BLOB_TEST PRIMARY KEY (ID)
+    CONSTRAINT PK_BLOB_TEST PRIMARY KEY (ID)
 );
 ```
 
-Заполняем тестовую таблицу 
+Для заполнения тестовой таблицы используется следующий скрипт:
 
 ```sql
 SET TERM ^;
@@ -96,9 +96,10 @@ Database options:
     -u [ --username ] user               User name
     -p [ --password ] password           Password
     -c [ --charset ] charset             Character set, default UTF8
-    -z [ --compress ]                    Wire compression, default False
     -n [ --limit-rows ] value            Limit of rows
     -i [ --max-inline-blob-size ] value  Maximum inline blob size, default 65535
+    -z [ --compress ]                    Wire compression, default False
+    -a [ --auto-blob-inline ]            Set optimal maximum inline blob size for each statement
 ```
 
 Привер использования:
@@ -300,6 +301,6 @@ Wire physical statistics:
   roundtrips = 90
 ```
 
-# Скачать утилиту для тестирования и БД
+## Скачать утилиту и базу данных для тестирования
 
 https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb-blob-test.zip
