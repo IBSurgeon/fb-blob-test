@@ -589,7 +589,9 @@ FROM BLOB_TEST
     /// <param name="status">Status</param>
     /// <param name="att">Database attachment</param>
     /// <param name="optimize"></param>
-    void testMixedRead(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, bool optimize, std::optional<uint64_t> limit_rows = {})
+    void testMixedRead(Firebird::ThrowStatusWrapper* status, Firebird::IAttachment* att, bool optimize, 
+        std::optional<unsigned short> max_inline_blob_size = {}, 
+        std::optional<uint64_t> limit_rows = {})
     {
         using std::chrono::duration_cast;
         using std::chrono::high_resolution_clock;
@@ -608,6 +610,9 @@ FROM BLOB_TEST
         Firebird::AutoRelease<Firebird::IStatement> stmt = att->prepare(status, tra, 0, sql.c_str(), 3, Firebird::IStatement::PREPARE_PREFETCH_METADATA);
 
         if (stmt->cloopVTable->version >= stmt->VERSION) {
+            if (max_inline_blob_size.has_value()) {
+                stmt->setMaxInlineBlobSize(status, max_inline_blob_size.value());
+            }
             std::cout << std::format("MaxInlineBlobSize = {}", stmt->getMaxInlineBlobSize(status)) << std::endl;
         }
 
@@ -688,9 +693,10 @@ Database options:
     -u [ --username ] user               User name
     -p [ --password ] password           Password
     -c [ --charset ] charset             Character set, default UTF8
-    -z [ --compress ]                    Wire compression, default False
     -n [ --limit-rows ] value            Limit of rows
     -i [ --max-inline-blob-size ] value  Maximum inline blob size, default 65535
+    -z [ --compress ]                    Wire compression, default False
+    -a [ --auto-blob-inline ]            Set optimal maximum inline blob size for each statement
 )";
 
     class TestApp final
@@ -703,6 +709,7 @@ Database options:
         std::optional<unsigned short> m_max_inline_blob_size;
         std::optional<uint64_t> m_limit_rows;
         bool m_wireCompression = false;
+        bool m_autoBlobInline = false;
     public:
         int exec(int argc, const char** argv);
     private:
@@ -761,6 +768,9 @@ Database options:
                 case 'z':
                     m_wireCompression = true;
                     break;
+                case 'a':
+                    m_autoBlobInline = true;
+                    break;
                 default:
                     std::cerr << "Error: unrecognized option '" << arg << "'. See: --help" << std::endl;
                     exit(-1);
@@ -799,6 +809,10 @@ Database options:
                 }
                 if (arg == "--compress") {
                     m_wireCompression = true;
+                    continue;
+                }
+                if (arg == "--auto-blob-inline") {
+                    m_autoBlobInline = true;
                     continue;
                 }
                 if (auto pos = arg.find("--database="); pos == 0) {
@@ -910,17 +924,19 @@ Database options:
 
             std::cout << std::endl << "** Test read mixed BLOBs and VARCHARs **" << std::endl;
             std::cout << "------------------------------------------------------------------------------------" << std::endl;
-            testMixedRead(&status, att, false, m_limit_rows);
+            testMixedRead(&status, att, false, m_max_inline_blob_size, m_limit_rows);
 
             std::cout << std::endl << "** Test read mixed BLOBs and VARCHARs with optimize **" << std::endl;
             std::cout << "------------------------------------------------------------------------------------" << std::endl;
-            testMixedRead(&status, att, true, m_limit_rows);
+            testMixedRead(&status, att, true, m_max_inline_blob_size, m_limit_rows);
 
 
             std::cout << std::endl << "** Test read only BLOB IDs **" << std::endl;
             std::cout << "------------------------------------------------------------------------------------" << std::endl;
+            if (m_autoBlobInline) {
+                m_max_inline_blob_size = 0;
+            }
             testReadBlobId(&status, att, Read_Blob_Kind::ALL_BLOB, m_max_inline_blob_size, m_limit_rows);
-
 
             att->detach(&status);
             att.release();
