@@ -146,5 +146,136 @@ COMMIT;
  
 == BLOB vs VARCHAR
 
-Попробуем выяснить почему скорость передачи данных по сети сильно падает, если SQL запросы возвращают столбцы типа BLOB. Для этого проведём сравнительный тест передачи одних и тех же данных, когда эти данные расположены в поле типа VARCHAR и BLOB.
+Попробуем выяснить почему работать по сети с высокой латентностью (интернет канал) становится некомфортно, если запросы выбираются данные содержащие BLOB столбцы. Для этого проведём сравнительный тест передачи одних и тех же данных, когда эти данные расположены в полях типа VARCHAR и BLOB. Тестирование будет производится с использованием fbclient версии 5.0.1 (более ранние версии ведут себя аналогично).
+
+Напомню в Firebird столбец типа VARCHAR может вмещать в себя 32765 байт, если в нём текст в кодировки UTF8, то VARCHAR может вместить до 8191 символа (4 байта на символ). Именно поэтому в таблице `BLOB_TEST` столбец `SHORT_CONTENT` определён как
+
+[source,sql]
+----
+SHORT_CONTENT  VARCHAR(8191) CHARACTER SET UTF8
+----
+
+Сначала посмотрим на статистику выполнения запроса передающие данные с использованием столбца типа BLOB, длина которого не превышает 8191 символ:
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+WHERE SHORT_BLOB IS TRUE
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+----
+Elapsed time: 36544ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+----
+
+А теперь сравним со статистикой выполнения запроса, использующего VARCHAR столбец:
+
+[source,sql]
+----
+SELECT
+  ID,
+  SHORT_CONTENT
+FROM BLOB_TEST
+WHERE SHORT_BLOB IS TRUE
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+----
+Elapsed time: 574ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+----
+
+Ого, передача данных с использованием столбца типа VARCHAR быстрее 64 раза! 
+
+Теперь попробуем измерить передачу не только коротких, но и средних BLOB полей:
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+----
+Elapsed time: 38256ms
+Max id: 1000
+Record count: 1000
+Content size: 12607388 bytes
+----
+
+Это ужасно медленно. Но начиная с Firebird 3.0 мы можем использовать сжатие трафика, и может быть в этом случае результаты будут лучше?
+
+== BLOB vs VARCHAR + сжатие сетевого трафика
+
+Ну что же попробуем включить сжатие сетевого трафика. Этом можно сделать указав при подключении к базе данных параметр `WireCompression=True`.
+
+Тест передачи коротких BLOB:
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+WHERE SHORT_BLOB IS TRUE
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+----
+Elapsed time: 36396ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+----
+
+Тест передачи данных в типе `VARCHAR(8191)`:
+
+[source,sql]
+----
+SELECT
+  ID,
+  SHORT_CONTENT
+FROM BLOB_TEST
+WHERE SHORT_BLOB IS TRUE
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+----
+Elapsed time: 489ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+----
+
+Тест передачи коротких и средних BLOB:
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+----
+Elapsed time: 38107ms
+Max id: 1000
+Record count: 1000
+Content size: 12607388 bytes
+----
+
+Ситуация почти не изменилась. Давайте попробуем разобраться в причинах.
+
+== Как передаются данные типа BLOB по сети
 
