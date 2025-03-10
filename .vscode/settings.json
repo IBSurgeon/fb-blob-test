@@ -5,5 +5,10 @@
         "editor.wordWrapColumn": 120
     },
     "cSpell.language": "ru,en",
-    "cSpell.maxNumberOfProblems": 5000
+    "cSpell.maxNumberOfProblems": 5000,
+    "files.associations": {
+        "*.embeddedhtml": "html",
+        "*.md": "markdown",
+        "chrono": "cpp"
+    }
 }
