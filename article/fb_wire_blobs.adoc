@@ -1,7 +1,7 @@
 [[fb-wire-blobs]]
 = Передача BLOB по сети в Firebird
 Симонов Денис
-v0.1 от 05.03.2025
+v0.7 от 11.03.2025
 :doctype: book
 :sectnums:
 :sectanchors:
@@ -167,6 +167,7 @@ WHERE SHORT_BLOB IS TRUE
 FETCH FIRST 1000 ROWS ONLY 
 ----
 
+.Статистика
 ----
 Elapsed time: 36544ms
 Max id: 1700
@@ -186,6 +187,7 @@ WHERE SHORT_BLOB IS TRUE
 FETCH FIRST 1000 ROWS ONLY 
 ----
 
+.Статистика
 ----
 Elapsed time: 574ms
 Max id: 1700
@@ -206,6 +208,7 @@ FROM BLOB_TEST
 FETCH FIRST 1000 ROWS ONLY 
 ----
 
+.Статистика
 ----
 Elapsed time: 38256ms
 Max id: 1000
@@ -574,7 +577,7 @@ Content size: 12607388 bytes
 
 == Улучшения при передачи BLOB с fbclient версии 5.0.2
 
-В Firebird 5.0.2 были сделаны значительные улучшения при передачи BLOB по сети. НА самом деле изменения коснулись только клиентской части Firebird, то есть fbclient. Вы можете почувствовать при передаче BLOB с любым Firebird старше 2.1 при использовании fbclient версии 5.0.2 и выше. Прежде чем объяснить, что именно было улучшено приведём результаты тестирования.
+В Firebird 5.0.2 была сделана небольшая оптимизация передачи BLOB по сети. На самом деле изменения коснулись только клиентской части Firebird, то есть fbclient. Вы можете почувствовать при передаче BLOB с любым Firebird старше 2.1 при использовании fbclient версии 5.0.2 и выше. Прежде чем объяснить, что именно было улучшено приведём результаты тестирования.
 
 Тест передачи `VARCHAR(8191)` (`WireCompression=False`):
 
@@ -806,4 +809,441 @@ Wire physical statistics:
 
 == Улучшения передачи BLOB по сети в Firebird 5.0.3
 
-// TODO: написать
+В Firebird 5.0.3 была сделана ещё одна оптимизация передачи BLOB по сети. На этот раз изменения коснулись сетевого протокола. От клиентской части и сервера требуется поддержка сетевого протокола версии 19. Поэтому для того чтобы задействовать эту оптимизацию необходимо обновить Firebird сервер и fbclient до версии 5.0.3.
+
+Посмотрим на результаты наших тестов с новыми версиями клиента и сервера.
+
+Тест передачи `VARCHAR(8191)` (`WireCompression=False`):
+
+[source,sql]
+----
+SELECT
+  ID,
+  SHORT_CONTENT
+FROM BLOB_TEST
+WHERE SHORT_BLOB IS TRUE
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+.Статистика (`WireCompression=False`):
+----
+Elapsed time: 554ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+Wire logical statistics:
+  send packets = 34
+  recv packets = 1034
+  send bytes = 716
+  recv bytes = 3396028
+Wire physical statistics:
+  send packets = 33
+  recv packets = 2394
+  send bytes = 716
+  recv bytes = 3396028
+  roundtrips = 33
+----
+
+.Статистика (`WireCompression=True`):
+----
+Elapsed time: 482ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+Wire logical statistics:
+  send packets = 34
+  recv packets = 1034
+  send bytes = 716
+  recv bytes = 3396028
+Wire physical statistics:
+  send packets = 33
+  recv packets = 472
+  send bytes = 277
+  recv bytes = 648656
+  roundtrips = 33
+----
+
+Тут всё ожидаемо, передача полей типа VARCHAR не изменялась.
+
+Тест передачи коротких BLOB:
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+WHERE SHORT_BLOB IS TRUE
+FETCH FIRST 1000 ROWS ONLY
+----
+
+.Статистика (`WireCompression=False`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 1110ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+Wire logical statistics:
+  send packets = 27
+  recv packets = 2027
+  send bytes = 576
+  recv bytes = 3453744
+Wire physical statistics:
+  send packets = 26
+  recv packets = 2458
+  send bytes = 576
+  recv bytes = 3453744
+  roundtrips = 26
+----
+
+.Статистика (`WireCompression=True`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 157ms
+Max id: 1700
+Record count: 1000
+Content size: 3366000 bytes
+Wire logical statistics:
+  send packets = 6
+  recv packets = 2006
+  send bytes = 156
+  recv bytes = 3453492
+Wire physical statistics:
+  send packets = 5
+  recv packets = 454
+  send bytes = 58
+  recv bytes = 672345
+  roundtrips = 5
+----
+
+Вот это да! Скорость передачи коротких BLOB без использования сжатия сетевого трафика выросла в 11 раз по сравнению с версией 5.0.2 (было 12739ms) и в 33 раза по сравнению с версией 5.0.1 (было 36544ms).
+
+При использовании сжатия сетевого трафика скорость передачи выросла в 81 раз по сравнению с 5.0.2 (было 12693ms) и в 232 раза по сравнению с 5.0.1 (было 36396ms). Но самое удивительное, короткие BLOB стали передаваться даже быстрее чем `VARCHAR(8191)` 482ms vs 157ms. Отличный результат!
+
+Попробуем посмотреть на статистику передачи коротких и средних BLOB:
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+.Статистика (`WireCompression=False`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 3254ms
+Max id: 1000
+Record count: 1000
+Content size: 12607388 bytes
+Wire logical statistics:
+  send packets = 249
+  recv packets = 2220
+  send bytes = 4552
+  recv bytes = 12701676
+Wire physical statistics:
+  send packets = 161
+  recv packets = 8872
+  send bytes = 4552
+  recv bytes = 12701676
+  roundtrips = 161
+----
+
+.Статистика (`WireCompression=True`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 1365ms
+Max id: 1000
+Record count: 1000
+Content size: 12607388 bytes
+Wire logical statistics:
+  send packets = 184
+  recv packets = 2155
+  send bytes = 3264
+  recv bytes = 12700876
+Wire physical statistics:
+  send packets = 97
+  recv packets = 1470
+  send bytes = 951
+  recv bytes = 2187089
+  roundtrips = 88
+----
+
+Отличный результат. Результаты предыдущих тестов:
+
+* 5.0.1 (`WireCompression=False`) 38256ms 
+* 5.0.1 (`WireCompression=True`) 38107ms
+* 5.0.2 (`WireCompression=False`) 17907ms 
+* 5.0.2 (`WireCompression=True`) 17044ms
+
+Теперь посмотрим, а имеет ли смысл использовать наш велосипед, когда короткие BLOB передаются как VARCHAR, а длинные как BLOB.
+
+[source,sql]
+----
+SELECT
+  BLOB_TEST.ID,
+  CASE
+    WHEN BLOB_TEST.SHORT_BLOB IS TRUE
+    THEN BLOB_TEST.SHORT_CONTENT
+  END AS SHORT_CONTENT,
+  CASE
+    WHEN BLOB_TEST.SHORT_BLOB IS FALSE
+    THEN BLOB_TEST.CONTENT
+  END AS CONTENT
+FROM BLOB_TEST
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+.Статистика (`WireCompression=False`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 3678ms
+Max id: 1000
+Record count: 1000
+Content size: 12607388 bytes
+Wire logical statistics:
+  send packets = 249
+  recv packets = 1631
+  send bytes = 4560
+  recv bytes = 12667632
+Wire physical statistics:
+  send packets = 161
+  recv packets = 8958
+  send bytes = 4560
+  recv bytes = 12667632
+  roundtrips = 161
+----
+
+.Статистика (`WireCompression=True`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 1576ms
+Max id: 1000
+Record count: 1000
+Content size: 12607388 bytes
+Wire logical statistics:
+  send packets = 207
+  recv packets = 1589
+  send bytes = 3732
+  recv bytes = 12667108
+Wire physical statistics:
+  send packets = 120
+  recv packets = 1527
+  send bytes = 1086
+  recv bytes = 2187418
+  roundtrips = 110
+----
+
+Нет, данный способ передачи данных медленней, чем непосредственная передача данных как BLOB.
+
+В целом получены отличные результаты, теперь можно смело использовать в выборках столбцы типа BLOB при размещении сервера Firebird в сетях с высокой латентностью (интернет канал).
+
+=== Как это работает?
+
+Если размер BLOB объекта меньше значения параметра `MaxInlineBlobSize` (по умолчанию 64 Кбайт - 1), то содержимое BLOB отправляется в том же потоке данных, что и основной набор результатов (ResultSet).
+
+Метаданные (размер, количество сегментов, тип) и данные BLOB объектов отправляются с использованием нового типа пакета `op_inline_blob` и новой структуры `P_INLINE_BLOB`.
+
+Пакет `op_inline_blob` отправляется перед соответствующим `op_sql_response` (в случае ответа на `op_execute2` или `op_exec_immediate2`) или `op_fetch_response` (ответ на `op_fetch`).
+
+Количество пакетов `op_inline_blob` может соответствовать количеству полей BLOB-объектов в выходном формате. Если BLOB-объект имеет значение `NULL` или слишком большой, то BLOB-объекты не отправляются.
+
+BLOB-объект отправляется целиком, то есть текущая реализация не поддерживает отправку части BLOB-объекта. Причины -- более простой код и тот факт, что поиск не реализован для сегментированных BLOB.
+
+Отправленные inline BLOB-объекты кешируются на стороне клиента на уровне соединения (`IAttachment`). На стороне клиента существует структура для быстрого поиска содержимого BLOB и его метаданных по BLOB идентификатору. Когда приложение открывает BLOB с помощью `IAttachment::openBlob` его метаданные и содержимое извлекаются из кеша BLOB. Вызовы `IAttachment::openBlob`, `IBlob::getSegment` и `IBlob::close` не передают никаких дополнительных сетевых пакетов. Вызов `IBlob::close` удаляет BLOB из кеша. Таким образом повторное открытие и использование BLOB будет приводить к дополнительным сетевым пакетам.
+
+Размер кеша под inline BLOB-объекты ограничен параметром `MaxBlobCacheSize` (по умолчанию 10 Мбайт). Если в кеше для inline BLOB-объекта нет места, то такой объект отбрасывается. Значение параметра `MaxBlobCacheSize` может быть установлено с помощью `isc_dpb_max_blob_cache_size` при соединении с базой данных и изменено позже с помощью метода `IAttachment::setMaxBlobCacheSize`. Изменение предела не применяется немедленно, то есть если новый предел меньше текущего используемого размера, то ничего не происходит.
+
+Максимальный размер inline BLOB-объекта регулируется парамером `MaxInlineBlobSize`, который по умолчанию равен 64 Кбайт - 1 (63535 байт). Это значение устанавливается для каждого подготовленного запроса перед началом его выполнения с помощью метода `IStatement::setMaxInlineBlobSize`. Если `MaxInlineBlobSize` установлен равным 0, то передача inline BLOB будет отключена. На уровне соединения можно изменить значение по умолчанию для вновь подготавливаемых запросов с помощью метода `IAttachment::setMaxInlineBlobSize`. Так же значение по умолчанию для параметра `MaxInlineBlobSize` можно установить с помощью `isc_dpb_max_inline_blob_size`.
+
+=== Всегда ли подходят параметры по умолчанию?
+
+Для ответа на этот вопрос попробуем запустить тест, который читает только идентификаторы BLOB без их содержимого и метаданных.
+
+[source,sql]
+----
+SELECT
+  ID,
+  CONTENT
+FROM BLOB_TEST
+FETCH FIRST 1000 ROWS ONLY 
+----
+
+.Статистика (`WireCompression=False`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 2049ms
+Max id: 1000
+Record count: 1000
+Wire logical statistics:
+  send packets = 75
+  recv packets = 2046
+  send bytes = 1536
+  recv bytes = 10438516
+Wire physical statistics:
+  send packets = 74
+  recv packets = 7170
+  send bytes = 1536
+  recv bytes = 10438516
+  roundtrips = 74
+----
+
+.Статистика (`WireCompression=True`):
+----
+MaxInlineBlobSize = 65535
+Elapsed time: 280ms
+Max id: 1000
+Record count: 1000
+Wire logical statistics:
+  send packets = 11
+  recv packets = 1982
+  send bytes = 256
+  recv bytes = 10437748
+Wire physical statistics:
+  send packets = 10
+  recv packets = 1171
+  send bytes = 86
+  recv bytes = 1618835
+  roundtrips = 10
+----
+
+Сравним эти результаты с клиентом версии 5.0.2:
+
+* `WireCompression=False` - 26ms
+* `WireCompression=True` - 28ms
+
+Мы видим, что время выполнения этого теста увеличилось. Что же произошло?
+
+Для всех BLOB-объектов длина, которых меньше чем значение параметра `MaxInlineBlobSize` сервер посылал дополнительный сетевой пакет `op_inline_blob`, но мы не использовали данные которые пересылались этим пакетом. 
+
+Но для чего нужен такой режим - спросите вы? На самом деле такой режим часто используется в приложениях с сетками данных, в которых содержимое BLOB не отображается непосредственно, а отображается в отдельном контроле при изменении позиции курсора в сетке. Например вы выбираете в сетке некоторую запись, а в отдельном контроле отображается картинка, хранящая с BLOB.
+
+В некоторых компонентах доступа Delphi на основе DataSet BLOB объекты могут извлекаться сразу и кешироваться на уровне набора данных (читаться по мере фетча данных из курсора) или откладываться до тех пор пока пользователь не начнёт читать данные из поля типа BLOB. Например, в компонентах доступа FireDac это зависит от флага `fiBlobs` который может быть установлен в свойстве `FetchOptions.Items` набора данных.
+
+Так как же быть в этом случае? Либо смириться с тем, что в режиме отложенного чтения BLOB ваш набор данных будет загружаться немного дольше, либо устанавливать значением параметра `MaxInlineBlobSize` в 0 с помощью `IStatement::setMaxInlineBlobSize`. Давайте попробуем сделать это для версии 5.0.3 и посмотрим на результат предыдущего теста.
+
+.Статистика (`WireCompression=False`):
+----
+MaxInlineBlobSize = 0
+Elapsed time: 26ms
+Max id: 1000
+Record count: 1000
+Wire logical statistics:
+  send packets = 3
+  recv packets = 1003
+  send bytes = 96
+  recv bytes = 32056
+Wire physical statistics:
+  send packets = 2
+  recv packets = 23
+  send bytes = 96
+  recv bytes = 32056
+  roundtrips = 2
+----
+
+.Статистика (`WireCompression=True`):
+----
+MaxInlineBlobSize = 0
+Elapsed time: 36ms
+Max id: 1000
+Record count: 1000
+Wire logical statistics:
+  send packets = 3
+  recv packets = 1003
+  send bytes = 96
+  recv bytes = 32056
+Wire physical statistics:
+  send packets = 2
+  recv packets = 2
+  send bytes = 37
+  recv bytes = 5796
+  roundtrips = 2
+----
+
+Загрузка inline BLOB-объектов отключена, чтение только идентификаторов BLOB показывает тоже время что и в 5.0.2.
+
+== Сравнение скорости передачи BLOB в различных версиях Firebird
+
+Для наглядности приведём сравнения времени загрузки 1000 записей коротких BLOB против VARCHAR(8191) в различных версиях Firebird и различными значениями параметра WireCompression (сокращённо WC).
+
+[cols="<2,<1,<1",stripes="none"]
+|===
+.2+^h|Версия Firebird и WireCompression
+2+^h|Тип данных
+
+^h|VARCHAR(8191)
+^h|BLOB SUB_TYPE TEXT
+
+|Firebird 5.0.1 (WC = False)
+>|574
+>|36544
+
+|Firebird 5.0.1 (WC = True)
+>|489
+>|36396
+
+|Firebird 5.0.2 (WC = False)
+>|569
+>|12739
+
+|Firebird 5.0.2 (WC = True)
+>|478
+>|12693
+
+|Firebird 5.0.3 (WC = False)
+>|554
+>|1110
+
+|Firebird 5.0.3 (WC = True)
+>|482
+>|157
+
+|===
+
+image::BLOB_vs_VARCHAR.png[]
+
+Также приведём сравнения времени загрузки 1000 записей разными способами: только BLOB или небольшие данные в VARCHAR, а большие - в BLOB.
+
+[cols="<2,<1,<1",stripes="none"]
+|===
+.2+^h|Версия Firebird и WireCompression
+2+^h|Способ загрузки
+
+^h|BLOB
+^h|BLOB + VARCHAR
+
+|Firebird 5.0.1 (WC = False)
+>|38256
+>|19288
+
+|Firebird 5.0.1 (WC = True)
+>|36396
+>|15752
+
+|Firebird 5.0.2 (WC = False)
+>|17907
+>|10843
+
+|Firebird 5.0.2 (WC = True)
+>|17044
+>|9476
+
+|Firebird 5.0.3 (WC = False)
+>|3254
+>|3678
+
+|Firebird 5.0.3 (WC = True)
+>|1365
+>|1576
+
+|===
+
+image::BLOB-methods.png[]
+
+== Выводы
+
+Если вы пробовали разместить сервер Firebird в облаке и работать с ним через интернет канал, но отказались от этой идеи из-за проблем с производительностью при передачи BLOB-объектов, то советуем попробовать ещё раз используя клиент (fbclient) и Firebird версии 5.0.3. Официально Firebird 5.0.3 ещё не вышел, но попробовать снапшоты можно уже сейчас, получив их по следующей ссылке https://github.com/FirebirdSQL/snapshots/releases/tag/snapshot-v5.0-release 
+
