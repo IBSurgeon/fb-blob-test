@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <optional>
+#include <vector>
 
 #include <firebird/Interface.h>
 #include <firebird/Message.h>
