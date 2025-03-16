@@ -304,3 +304,13 @@ Wire physical statistics:
 ## Скачать утилиту и базу данных для тестирования
 
 https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb-blob-test.zip
+
+# Статья на русском языке
+
+* PDF - [fb_wire_blobs_ru.pdf](https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb_wire_blobs_ru.pdf)
+* HTML - [fb_wire_blobs_ru-html.zip](https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb_wire_blobs_ru-html.zip)
+
+# Статья на английском языке
+
+* PDF - [fb_wire_blobs_en.pdf](https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb_wire_blobs_en.pdf)
+* HTML - [fb_wire_blobs_en-html.zip](https://github.com/sim1984/fb-blob-test/releases/download/1.0/fb_wire_blobs_en-html.zip)
