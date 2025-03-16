@@ -1,7 +1,7 @@
 [[fb-wire-blobs]]
 = Передача BLOB по сети в Firebird
 Симонов Денис
-v0.7 от 11.03.2025
+v1.0 от 16.03.2025
 :doctype: book
 :sectnums:
 :sectanchors:
