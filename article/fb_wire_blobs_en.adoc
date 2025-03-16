@@ -1190,7 +1190,7 @@ For clarity, we will compare the loading time of 1000 short BLOB records against
 
 |===
 
-image::BLOB_vs_VARCHAR.png[]
+image::BLOB_vs_VARCHAR-en.png[]
 
 We will also provide comparisons of loading times for 1000 records in different ways: only BLOB or small data in VARCHAR and large data in BLOB.
 
@@ -1228,7 +1228,7 @@ We will also provide comparisons of loading times for 1000 records in different 
 
 |===
 
-image::BLOB-methods.png[]
+image::BLOB-methods-en.png[]
 
 == Conclusions
 
