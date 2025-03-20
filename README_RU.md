@@ -1,8 +1,8 @@
-# Test BLOB transfer over the wire
+# Тестирование передачи BLOB по сети
 
-## Preparing the database
+## Подготовка базы данных
 
-Let's create a table to store the files. For example, I loaded the contents of the `lucene_udr` library source code (https://github.com/IBSurgeon/lucene_udr) into this table. Source code files can be short or long, so they are ideal for demonstrating BLOB transfer over the wire.
+Создадим таблицу, в которой будут хранится файлы. Для примера я загрузил в эту таблицу содержимое исходных кодов библиотеки lucene_udr (https://github.com/IBSurgeon/lucene_udr). Файлы исходных кодов могут быть короткими и длинными, поэтому для демонстрации передачи BLOB по сети они подходят идеально.
 
 ```sql
 CREATE TABLE BLOB_SAMPLE (
@@ -15,7 +15,7 @@ ALTER TABLE BLOB_SAMPLE ADD PRIMARY KEY (ID);
 ALTER TABLE BLOB_SAMPLE ADD UNIQUE (FILE_NAME);
 ```
 
-Since the project is not large, the number of source code files in it is not as large as we would like. To make the testing results more visual in numbers, we will increase the number of BLOB records to 10,000. To do this, we will create a separate table `BLOB_TEST` with the following structure:
+Поскольку проект не большой, то количество файлов с исходными текстами в нём не так много как хотелось бы. Чтобы результаты тестирования были более наглядны в цифрах, доведём количество записей с BLOB до 10000. Для этого создадим отдельную таблицу `BLOB_TEST` со следующей структурой:
 
 ```sql
 RECREATE TABLE BLOB_TEST (
@@ -27,7 +27,7 @@ RECREATE TABLE BLOB_TEST (
 );
 ```
 
-The following script is used to fill the test table:
+Для заполнения тестовой таблицы используется следующий скрипт:
 
 ```sql
 SET TERM ^;
@@ -52,7 +52,7 @@ BEGIN
     DO
     BEGIN
       I = I + 1;
-      -- The BLOB is placed into a string variable that is 8191 characters long.
+      -- BLOB помещается в строковую переменную 8191
       IS_SHORT = (C.CH_L < 8191);
 
       INSERT INTO BLOB_TEST (
@@ -61,10 +61,11 @@ BEGIN
         SHORT_BLOB
       )
       VALUES (
-        IIF(:IS_SHORT, :C.CONTENT, NULL), -- if BLOB is short we write it in VARCHAR field
+        IIF(:IS_SHORT, :C.CONTENT, NULL), -- если BLOB короткий пишем в VARCHAR поле
         :C.CONTENT,
         :IS_SHORT
       );
+      -- выходим когда вставлено 10000 записей
       IF (I = 10000) THEN EXIT;
     END
   END
@@ -75,15 +76,15 @@ SET TERM ;^
 COMMIT;
 ```
 
-## Description fb-blob-test
+## Описание приложения fb-blob-test
 
-To get help about application switches, enter the command:
+Для получения справки о ключах приложения наберите команду:
 
 ```bash
 fb-blob-test -h
 ```
 
-The following help will be displayed:
+Будет выведена следующая справка:
 
 ```
 Usage fb-blob-test [<database>] <options>
@@ -101,13 +102,13 @@ Database options:
     -a [ --auto-blob-inline ]            Set optimal maximum inline blob size for each statement
 ```
 
-Example of use:
+Привер использования:
 
 ```bash
 fb-blob-test -d inet://localhost/blob_test -u SYSDBA -p masterkey -z
 ```
 
-## Example of output
+## Пример вывода
 
 ```
 ===== Test of BLOBs transmission over the network =====
@@ -300,11 +301,11 @@ Wire physical statistics:
   roundtrips = 90
 ```
 
-## Download the utility and database for testing
+## Скачать утилиту и базу данных для тестирования
 
 https://github.com/IBSurgeon/fb-blob-test/releases/download/1.0/fb-blob-test.zip
 
-## Download article
+## Статья на русском языке
 
-* PDF - [fb_wire_blobs_en.pdf](https://github.com/IBSurgeon/fb-blob-test/releases/download/1.0/fb_wire_blobs_en.pdf)
-* HTML - [fb_wire_blobs_en-html.zip](https://github.com/IBSurgeon/fb-blob-test/releases/download/1.0/fb_wire_blobs_en-html.zip)
+* PDF - [fb_wire_blobs_ru.pdf](https://github.com/IBSurgeon/fb-blob-test/releases/download/1.0/fb_wire_blobs_ru.pdf)
+* HTML - [fb_wire_blobs_ru-html.zip](https://github.com/IBSurgeon/fb-blob-test/releases/download/1.0/fb_wire_blobs_ru-html.zip)
